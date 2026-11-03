@@ -1,18 +1,18 @@
-# trame-sql-source
+# sql-source
 
 A SQL source plugin for [Trame](https://github.com/Andarius/trame). It fills a Trame database from a **read-only query** on a PostgreSQL you choose, on demand or on a schedule (every 5 minutes to 30 days).
 
 ## Use
 
 ```bash
-tramecli plugins add Andarius/trame-sql-source
+tramecli plugins add Andarius/trame-plugins/sql-source
 ```
 
-Or, in a Trame checkout with this repo next to it:
+Or, from a clone of this repo next to a Trame checkout:
 
 ```bash
-echo '{ "plugins": ["../trame-sql-source"] }' > plugins.local.json
-just plugins && just dev
+just compose sql-source   # writes ../trame/plugins.local.json and composes the plugin
+(cd ../trame && just dev)
 ```
 
 Open a database page and pick **⇣ Connect** (or "Fill from a SQL query" on an empty one), paste a connection string and a query, run it, choose the key column and map or skip the other columns. A dry run shows the table as the write would leave it before anything is saved.
@@ -25,17 +25,14 @@ Connection strings live only in this machine's `settings.json` (mode 0600). They
 
 ## Test
 
-`TRAME` points at the Trame checkout (default `../trame`), with the plugin composed into it:
+From the repo root (see its README): `just lint sql-source`, then `just compose sql-source && just check`.
 
 ```bash
-just hooks   # pre-commit runs `just lint`
-just lint    # rustfmt, oxlint (Trame's config), bun tests (import boundary, version)
-just check   # lint, then clippy, the Rust unit and integration tests (real PostgreSQL) and the web typecheck
-just e2e --project trame-sql-source   # from the Trame checkout: the e2e/ specs
+just e2e --project sql-source   # from the Trame checkout: the e2e/ specs
 ```
 
-`tests/*.rs` are linked into Trame's `crates/trame-local/tests/` by `just plugins` and run against a real Trame server and PostgreSQL (`.scratch/package`, from `bash scripts/rust-package.sh prepare`).
+`tests/*.rs` are wrapped into Trame's `crates/trame-local/tests/` by `just compose` and run against a real Trame server and PostgreSQL (`.scratch/package`, from `bash scripts/rust-package.sh prepare`).
 
 ## Release
 
-Bump `VERSION` in `version.ts` and `src/mod.rs`, merge, then push a matching tag (`git tag v0.1.0 && git push origin v0.1.0`). The release workflow refuses a tag that differs from `VERSION`; Trame then shows "Update available" for older installs.
+Bump `VERSION` in `version.ts` and `src/mod.rs`, merge, then push `sql-source-vX.Y.Z` (see the repo README).

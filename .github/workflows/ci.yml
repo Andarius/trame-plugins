@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    env:
+      TRAME: ${{ github.workspace }}/trame
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Andarius/trame
+          path: trame
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: trame-plugins
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22.23.4"
+          cache: npm
+          cache-dependency-path: trame/app/web/package-lock.json
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.4"
+
+      - uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3.0.0
+
+      - name: Rust toolchain and PostgreSQL runtime libraries
+        run: |
+          cd trame && rustup toolchain install
+          sudo apt-get update
+          sudo apt-get install -y libicu74 liburing2 libnuma1 libxml2 libldap2 libpam0g libzstd1 liblz4-1 libpq5
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: trame
+
+      - name: Compose every plugin into Trame
+        run: |
+          cd trame && bun install --frozen-lockfile && (cd app/web && npm ci) && bash scripts/rust-package.sh prepare
+          cd ../trame-plugins && just compose
+
+      # one build for all plugins: also catches two plugins that cannot coexist
+      - name: Lint, clippy, unit and integration tests, web typecheck (just check)
+        run: cd trame-plugins && just check

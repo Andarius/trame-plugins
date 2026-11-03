@@ -15,7 +15,7 @@ use std::{
 pub const ID: &str = "sql-source";
 // keep in step with version.ts (version_test.ts checks it)
 const VERSION: &str = "0.1.0";
-const REPO: &str = "Andarius/trame-sql-source";
+const REPO: &str = "Andarius/trame-plugins/sql-source";
 pub const MAX_ROWS: usize = 10_000;
 const TIMEOUT_MS: u64 = 30_000;
 const PREVIEW_ROWS: usize = 50;

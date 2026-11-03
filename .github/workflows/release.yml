@@ -1,0 +1,34 @@
+name: Release
+
+on:
+  push:
+    tags: ["*-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.4"
+
+      - name: Tag names a plugin at its version
+        id: tag
+        run: echo "plugin=$(bun release.ts "$GITHUB_REF_NAME")" >> "$GITHUB_OUTPUT"
+
+      # notes since this plugin's previous release, not the repo's; never "latest" (a plugin has its own)
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLUGIN: ${{ steps.tag.outputs.plugin }}
+        run: |
+          prev=$(git tag --list "$PLUGIN-v*" --sort=-v:refname | grep -vxF "$GITHUB_REF_NAME" | head -1)
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --latest=false \
+            --title "$GITHUB_REF_NAME" ${prev:+--notes-start-tag "$prev"}

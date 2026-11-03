@@ -26,7 +26,7 @@ mod tests;
 pub const ID: &str = "deployments";
 // keep in step with version.ts (version_test.ts checks it)
 const VERSION: &str = "0.1.0";
-const REPO: &str = "Andarius/trame-deployments";
+const REPO: &str = "Andarius/trame-plugins/deployments";
 // TRACKER_DEPLOYMENTS_FIXTURE=sample serves this file (e2e); any other value is a path under .scratch
 const SAMPLE: &str = include_str!("../fixture.sample.json");
 
