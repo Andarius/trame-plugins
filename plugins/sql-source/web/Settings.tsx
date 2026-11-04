@@ -11,6 +11,7 @@ import {
   useSources,
 } from "./api";
 import { SqlSourceDrawer } from "./Drawer";
+import { SchemaView } from "./Schema";
 import { SourceLogo } from "./Logo";
 
 const field =
@@ -23,6 +24,7 @@ function Connections() {
   const [name, setName] = useState("");
   const [dsn, setDsn] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [diagram, setDiagram] = useState<Connection | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => getSettings().then((s) => setConns(s.connections)).catch(() => {}), []);
@@ -65,6 +67,7 @@ function Connections() {
             )
             : <span className="min-w-0 flex-1 truncate text-[12.5px]">{c.name}</span>}
           <span className="max-w-[160px] truncate text-[11px] text-ink-muted/70">{c.host}</span>
+          <button type="button" className={smallBtn} title="tables and foreign keys" onClick={() => setDiagram(c)}>Schema</button>
           <button type="button" className={smallBtn} onClick={() => setRenaming(c.id)}>Rename</button>
           <button
             type="button"
@@ -116,6 +119,7 @@ function Connections() {
           </div>
         )}
       {error && <span className="text-[11px] text-blocked">{error}</span>}
+      {diagram && <SchemaView connectionId={diagram.id} name={diagram.name} onClose={() => setDiagram(null)} />}
     </div>
   );
 }

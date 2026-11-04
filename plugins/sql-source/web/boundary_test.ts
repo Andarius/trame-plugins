@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 
-// The web side reaches Trame only through "@trame/web-api".
-const ok = (s: string) => s.startsWith("./") || s === "react" || s === "@trame/web-api";
+// The web side reaches Trame only through "@trame/web-api"; d3 modules come from Trame's app/web/package.json.
+const ok = (s: string) => s.startsWith("./") || s === "react" || s === "@trame/web-api" || s === "d3-selection" || s === "d3-zoom";
 
 test("the web side imports Trame only through @trame/web-api", () => {
   const bad: string[] = [];

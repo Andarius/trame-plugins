@@ -1,5 +1,6 @@
 // SQL source client: types and calls against /api/plugins/sql-source.
 import { useCallback, useEffect, useState } from "react";
+import type { Schema } from "./schema-layout";
 
 export type Column = { name: string; type: string };
 export type RefreshStatus = {
@@ -130,3 +131,6 @@ export const scheduleLabel = (min: number) =>
 /** Last-refresh summary: "N new, M changed" or the error text. */
 export const lastLabel = (l: RefreshStatus | null) =>
   !l ? "never refreshed" : l.error ?? `${l.created} new, ${l.updated} changed`;
+
+/** Tables, columns and foreign keys of a saved connection's database (read-only catalog query). */
+export const readSchema = (b: { connection_id: string }) => call<Schema & { ok: true }>("/schema", b);
