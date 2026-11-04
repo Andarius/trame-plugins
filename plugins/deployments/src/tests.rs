@@ -12,7 +12,7 @@ fn gitlab_auth_never_lends_ambient_token_to_unsaved_host() {
     assert_eq!(saved.token, "fixture-env-secret");
     let unsaved = super::auth::gitlab(&json!({}), "http://attacker.example", false);
     assert_eq!(unsaved.source, "none");
-    assert!(unsaved.token.is_empty());
+    assert_eq!(unsaved.token, "");
     let supplied = super::auth::gitlab(
         &json!({"gitlabToken":"pat-123"}),
         "http://attacker.example",

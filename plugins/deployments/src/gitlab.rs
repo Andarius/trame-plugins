@@ -117,9 +117,8 @@ pub async fn pending(
         }
         .unwrap_or("");
         if status == "failed"
-            && DateTime::parse_from_rfc3339(since).ok().is_some_and(|t| {
-                Utc::now().signed_duration_since(t).num_milliseconds() > 10_800_000
-            })
+            && DateTime::parse_from_rfc3339(since)
+                .is_ok_and(|t| Utc::now().signed_duration_since(t).num_milliseconds() > 10_800_000)
         {
             continue;
         }
