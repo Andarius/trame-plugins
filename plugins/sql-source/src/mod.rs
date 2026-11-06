@@ -366,6 +366,68 @@ pub fn run_query(dsn: &str, query: &str, max_rows: usize) -> Result<SourceResult
     Ok(SourceResult { columns, rows })
 }
 
+/// Tables the schema diagram reads at most; a bigger catalog is refused, not truncated.
+const MAX_TABLES: i64 = 2_000;
+
+// tables (incl. views), their columns with primary-key flags, and the foreign keys between them
+const SCHEMA_SQL: &str = r"
+with rels as (
+  select c.oid, n.nspname as schema, c.relname as name, c.relkind::text as kind,
+         greatest(c.reltuples, 0)::bigint as rows
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where c.relkind in ('r','p','v','m','f')
+    and n.nspname not in ('pg_catalog','information_schema') and n.nspname not like 'pg_toast%'
+    and n.nspname not like 'pg_temp%' and not c.relispartition
+)
+select json_build_object(
+  'count', (select count(*) from rels),
+  'tables', coalesce((select json_agg(json_build_object(
+      'schema', r.schema, 'name', r.name, 'kind', r.kind, 'rows', r.rows,
+      'columns', (select coalesce(json_agg(json_build_object(
+          'name', a.attname, 'type', format_type(a.atttypid, a.atttypmod),
+          'nullable', not a.attnotnull,
+          'pk', exists (select 1 from pg_constraint p
+                        where p.conrelid = r.oid and p.contype = 'p' and a.attnum = any(p.conkey))
+        ) order by a.attnum), '[]')
+        from pg_attribute a where a.attrelid = r.oid and a.attnum > 0 and not a.attisdropped)
+    ) order by r.schema, r.name) from (select * from rels order by schema, name limit $1) r), '[]'),
+  'fks', coalesce((select json_agg(json_build_object(
+      'name', k.conname,
+      'from', json_build_object('schema', s.schema, 'table', s.name, 'columns',
+        (select json_agg(a.attname order by u.i) from unnest(k.conkey) with ordinality u(n, i)
+         join pg_attribute a on a.attrelid = k.conrelid and a.attnum = u.n)),
+      'to', json_build_object('schema', t.schema, 'table', t.name, 'columns',
+        (select json_agg(a.attname order by u.i) from unnest(k.confkey) with ordinality u(n, i)
+         join pg_attribute a on a.attrelid = k.confrelid and a.attnum = u.n))
+    ) order by k.conname)
+    from pg_constraint k join rels s on s.oid = k.conrelid join rels t on t.oid = k.confrelid
+    where k.contype = 'f'), '[]')
+)::text";
+
+/// Tables, columns and foreign keys of the database behind `dsn`, read-only.
+pub fn read_schema(dsn: &str) -> Result<Value> {
+    let mut client = connect(dsn)?;
+    let fail = |e: postgres::Error| -> anyhow::Error {
+        let message = e
+            .as_db_error()
+            .map_or_else(|| e.to_string(), |d| d.message().to_owned());
+        SourceError(scrub(&message, dsn)).into()
+    };
+    let mut tx = client
+        .build_transaction()
+        .read_only(true)
+        .start()
+        .map_err(fail)?;
+    let row = tx.query_one(SCHEMA_SQL, &[&MAX_TABLES]).map_err(fail)?;
+    let schema: Value = serde_json::from_str(row.get::<_, &str>(0))?;
+    if schema["count"].as_i64().unwrap_or(0) > MAX_TABLES {
+        return refuse(format!(
+            "the database has more than {MAX_TABLES} tables — too many to draw"
+        ));
+    }
+    Ok(json!({"ok": true, "tables": schema["tables"], "fks": schema["fks"]}))
+}
+
 /// A source value in the cell shape of a `kind` column; null clears the cell.
 pub fn cell_value(kind: &str, v: &Value) -> Value {
     match (kind, v) {
@@ -971,6 +1033,7 @@ pub fn handle(env: &Env, method: &str, sub: &str, body: &Value) -> Result<(u16, 
         Ok(match (parts.as_slice(), method) {
             (["", "status"], _) => (200, status(&slice)),
             (["", "preview"], "POST") => (200, preview(env, body)?),
+            (["", "schema"], "POST") => (200, read_schema(&draft_connection(env, body)?.1)?),
             (["", "sources"], "POST") => {
                 let (connection_id, dsn) = draft_connection(env, body)?;
                 let mut source = draft_source(body);

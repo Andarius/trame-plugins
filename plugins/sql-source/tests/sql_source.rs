@@ -424,3 +424,73 @@ fn a_mapping_renames_skips_and_releases_columns() {
         "released: {active}"
     );
 }
+
+#[test]
+fn the_schema_lists_tables_keys_and_foreign_keys() {
+    let f = fixture();
+    exec(
+        &f,
+        "create schema shop;
+         create table shop.customer (id int primary key, name text not null);
+         create table shop.orders (id int primary key, customer_id int references shop.customer, note text);
+         create table shop.line (order_id int, n int, primary key (order_id, n),
+                                 foreign key (order_id) references shop.orders);
+         create view shop.big_orders as select * from shop.orders;",
+    );
+    let (status, schema) = call(&f, "POST", "/schema", &json!({"dsn": f.dsn}));
+    assert_eq!(status, 200, "{schema}");
+    let names: Vec<String> = schema["tables"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| {
+            format!(
+                "{}.{}:{}",
+                t["schema"].as_str().unwrap(),
+                t["name"].as_str().unwrap(),
+                t["kind"].as_str().unwrap()
+            )
+        })
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "public.kr:r",
+            "shop.big_orders:v",
+            "shop.customer:r",
+            "shop.line:r",
+            "shop.orders:r"
+        ]
+    );
+    let line = &schema["tables"][3]["columns"];
+    assert_eq!(
+        line,
+        &json!([
+            {"name":"order_id","type":"integer","nullable":false,"pk":true},
+            {"name":"n","type":"integer","nullable":false,"pk":true},
+        ])
+    );
+    let fks: Vec<String> = schema["fks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|k| {
+            format!(
+                "{}{} -> {}{}",
+                k["from"]["table"], k["from"]["columns"], k["to"]["table"], k["to"]["columns"]
+            )
+        })
+        .collect();
+    assert_eq!(
+        fks,
+        [
+            r#""line"["order_id"] -> "orders"["id"]"#,
+            r#""orders"["customer_id"] -> "customer"["id"]"#,
+        ]
+    );
+    let (status, refused) = call(&f, "POST", "/schema", &json!({"connection_id": "missing"}));
+    assert_eq!(
+        (status, refused["error"].as_str()),
+        (400, Some("no connection — pick or add one"))
+    );
+}

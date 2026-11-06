@@ -21,6 +21,10 @@ Open a database page and pick **⇣ Connect** (or "Fill from a SQL query" on an 
 - **Columns** the source fills are read-only in Trame; a column you map elsewhere, skip or disconnect goes back to you with its values.
 - **Queries** run in a read-only transaction with a 30 s timeout and a 10 000-row cap; TLS connection strings are refused for now.
 
+**Schema** on a saved connection (plugin settings) draws its tables and foreign keys: referenced tables to the left, edges from each foreign-key column to the column it references. Tables show their key columns; click a header for all of them, double-click (or search and press Enter) to focus on a table and its neighbours within 1–3 hops, toggle schemas, hover to trace a table's links. It reads `pg_catalog` read-only, up to 2 000 tables.
+
+![Schema diagram of a demo database](docs/schema.gif)
+
 Connection strings live only in this machine's `settings.json` (mode 0600). They are never synced to the hub and never sent back to the UI; only the rows sync. Settings from the built-in plugin of Trame ≤ 0.28 carry over (same `sql-source` id).
 
 ## Test
